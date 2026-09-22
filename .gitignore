@@ -7,3 +7,7 @@ appsettings.Local.json
 
 *.user
 *.suo
+
+*.db
+*.db-shm
+*.db-wal

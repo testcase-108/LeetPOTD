@@ -1,4 +1,5 @@
 using LeetPOTD.Configuration;
+using LeetPOTD.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -6,6 +7,7 @@ namespace LeetPOTD.Workers;
 
 public sealed class MainWorker(
     ILogger<MainWorker> logger,
+    IServiceScopeFactory scopeFactory,
     IOptions<Timezone> options) : BackgroundService
 {
     private readonly Timezone _options = options.Value;
@@ -63,22 +65,28 @@ public sealed class MainWorker(
             "POTD job triggered at {Time}",
             DateTimeOffset.Now);
 
-        // We will add LeetCode logic here next.
+        using var scope = scopeFactory.CreateScope();
+        var orchestrator = scope.ServiceProvider.GetRequiredService<IPotdOrchestrator>();
 
-        await Task.CompletedTask;
+        var run = await orchestrator.RunAsync(cancellationToken);
+
+        logger.LogInformation(
+            "POTD job completed with status {Status}. RunId: {RunId}",
+            run.Status,
+            run.Id);
     }
 
     private TimeSpan GetDelayUntilNextRun()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
-            _options.Zone);
+            _options.Zone ?? "Asia/Kolkata");
 
         var nowUtc = DateTimeOffset.UtcNow;
 
         var localNow =
             TimeZoneInfo.ConvertTime(nowUtc, timeZone);
 
-        var runTime = TimeSpan.Parse(_options.Time);
+        var runTime = TimeSpan.Parse(_options.Time ?? "00:00");
 
         var nextRunLocal = localNow.Date + runTime;
 
